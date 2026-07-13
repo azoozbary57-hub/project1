@@ -1,0 +1,16 @@
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+
+# Platform folders are generated locally via `flutter create .` and are not
+# checked in from this environment (no Flutter SDK available here).
+android/
+ios/
+windows/
+linux/
+macos/
+web/

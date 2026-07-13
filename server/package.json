@@ -1,0 +1,13 @@
+{
+  "name": "notes-sync-relay",
+  "version": "1.0.0",
+  "description": "Zero-knowledge relay server for syncing notes between paired devices without accounts or email",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
