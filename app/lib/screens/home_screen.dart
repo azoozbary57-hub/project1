@@ -7,6 +7,7 @@ import '../models/note.dart';
 import '../sync/sync_service.dart';
 import 'note_editor_screen.dart';
 import 'pairing_screen.dart';
+import 'trash_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final NotesRepository repo;
@@ -80,6 +81,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _openTrash() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => TrashScreen(repo: widget.repo, syncService: widget.syncService),
+    ));
+    _load();
+  }
+
   Future<void> _openEditor([Note? note]) async {
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => NoteEditorScreen(
@@ -97,6 +105,11 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('الملاحظات'),
         actions: [
+          IconButton(
+            tooltip: 'سلة المحذوفات',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: _openTrash,
+          ),
           IconButton(
             tooltip: _statusLabel,
             icon: Icon(_statusIcon),

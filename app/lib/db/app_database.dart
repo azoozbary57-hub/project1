@@ -105,6 +105,32 @@ class NotesRepository {
     ));
   }
 
+  Future<List<Note>> getTrash() async {
+    final db = await _db;
+    final rows = await db.query(
+      'notes',
+      where: 'deleted = 1',
+      orderBy: 'updated_at DESC',
+    );
+    return rows.map(Note.fromDbMap).toList();
+  }
+
+  Future<void> restore(String id) async {
+    final existing = await getById(id);
+    if (existing == null) return;
+    await put(existing.copyWith(
+      deleted: false,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    ));
+  }
+
+  /// Removes the note from this device's local database only. Other devices
+  /// keep their own tombstone until they independently purge it too.
+  Future<void> purge(String id) async {
+    final db = await _db;
+    await db.delete('notes', where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<String?> getMeta(String key) async {
     final db = await _db;
     final rows = await db.query('meta', where: 'key = ?', whereArgs: [key]);
