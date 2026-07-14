@@ -48,8 +48,21 @@ jobs:
       - name: Zip build output
         shell: pwsh
         run: |
-          $releaseDir = Get-ChildItem -Path build\windows -Recurse -Directory -Filter Release | Select-Object -First 1
-          Compress-Archive -Path (Join-Path $releaseDir.FullName '*') -DestinationPath notes-sync-windows.zip
+          $ErrorActionPreference = 'Stop'
+          $candidates = @(
+            'build\windows\x64\runner\Release',
+            'build\windows\runner\Release',
+            'build\windows\arm64\runner\Release'
+          )
+          $releasePath = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $releasePath) {
+            Write-Host "Release folder not found in any of: $candidates"
+            Write-Host "Full contents of build\windows:"
+            Get-ChildItem -Path build\windows -Recurse | ForEach-Object { Write-Host $_.FullName }
+            throw "Could not locate the Windows release build output"
+          }
+          Write-Host "Using release path: $releasePath"
+          Compress-Archive -Path (Join-Path $releasePath '*') -DestinationPath notes-sync-windows.zip -Force
       - uses: actions/upload-artifact@v4
         with:
           name: notes-sync-windows
