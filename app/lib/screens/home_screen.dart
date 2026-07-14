@@ -24,6 +24,8 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription? _remoteSub;
   StreamSubscription? _statusSub;
   SyncStatus _status = SyncStatus.unpaired;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -34,18 +36,30 @@ class _HomeScreenState extends State<HomeScreen> {
     _statusSub = widget.syncService.onStatusChange.listen((s) {
       if (mounted) setState(() => _status = s);
     });
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
+    });
   }
 
   @override
   void dispose() {
     _remoteSub?.cancel();
     _statusSub?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
     final notes = await widget.repo.getAll();
     if (mounted) setState(() => _notes = notes);
+  }
+
+  List<Note> get _visibleNotes {
+    if (_searchQuery.isEmpty) return _notes;
+    return _notes.where((note) {
+      return note.title.toLowerCase().contains(_searchQuery) ||
+          note.body.toLowerCase().contains(_searchQuery);
+    }).toList();
   }
 
   IconData get _statusIcon {
@@ -116,26 +130,57 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _openPairing,
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'ابحث في الملاحظات...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: _searchController.clear,
+                      ),
+                isDense: true,
+                filled: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
           await widget.syncService.syncNow();
           await _load();
         },
-        child: _notes.isEmpty
+        child: _visibleNotes.isEmpty
             ? LayoutBuilder(
                 builder: (context, constraints) => SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                    child: const Center(child: Text('لا توجد ملاحظات بعد. اضغط + للإضافة.')),
+                    child: Center(
+                      child: Text(
+                        _notes.isEmpty
+                            ? 'لا توجد ملاحظات بعد. اضغط + للإضافة.'
+                            : 'ما فيه نتائج مطابقة للبحث.',
+                      ),
+                    ),
                   ),
                 ),
               )
             : ListView.builder(
-                itemCount: _notes.length,
+                itemCount: _visibleNotes.length,
                 itemBuilder: (context, index) {
-                  final note = _notes[index];
+                  final note = _visibleNotes[index];
                   return ListTile(
                     title: Text(note.title.isEmpty ? '(بدون عنوان)' : note.title),
                     subtitle: Text(
