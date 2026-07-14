@@ -22,27 +22,7 @@ jobs:
       - name: Generate Android platform folder
         run: flutter create . --platforms=android --org com.example
       - name: Add required Android manifest permissions
-        run: |
-          python3 - <<'PY'
-          import re
-          path = "android/app/src/main/AndroidManifest.xml"
-          with open(path) as f:
-              xml = f.read()
-          xml = re.sub(
-              r"(<manifest[^>]*>)",
-              r"\1\n    <uses-permission android:name=\"android.permission.INTERNET\" />\n    <uses-permission android:name=\"android.permission.CAMERA\" />",
-              xml,
-              count=1,
-          )
-          xml = re.sub(
-              r"<application ",
-              '<application android:usesCleartextTraffic="true" ',
-              xml,
-              count=1,
-          )
-          with open(path, "w") as f:
-              f.write(xml)
-          PY
+        run: python3 ../.github/scripts/patch_android_manifest.py android/app/src/main/AndroidManifest.xml
       - run: flutter pub get
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
