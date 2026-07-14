@@ -1,0 +1,76 @@
+name: Build Notes Sync app
+
+on:
+  push:
+    branches: [claude/notes-app-sync-r238wh]
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-app.yml'
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Generate Android platform folder
+        run: flutter create . --platforms=android --org com.example
+      - name: Add required Android manifest permissions
+        run: |
+          python3 - <<'PY'
+          import re
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path) as f:
+              xml = f.read()
+          xml = re.sub(
+              r"(<manifest[^>]*>)",
+              r"\1\n    <uses-permission android:name=\"android.permission.INTERNET\" />\n    <uses-permission android:name=\"android.permission.CAMERA\" />",
+              xml,
+              count=1,
+          )
+          xml = re.sub(
+              r"<application ",
+              '<application android:usesCleartextTraffic="true" ',
+              xml,
+              count=1,
+          )
+          with open(path, "w") as f:
+              f.write(xml)
+          PY
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notes-sync-android
+          path: app/build/app/outputs/flutter-apk/app-release.apk
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Generate Windows platform folder
+        run: flutter create . --platforms=windows --org com.example
+      - run: flutter pub get
+      - run: flutter config --enable-windows-desktop
+      - run: flutter build windows --release
+      - name: Zip build output
+        shell: pwsh
+        run: |
+          $releaseDir = Get-ChildItem -Path build\windows -Recurse -Directory -Filter Release | Select-Object -First 1
+          Compress-Archive -Path (Join-Path $releaseDir.FullName '*') -DestinationPath notes-sync-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notes-sync-windows
+          path: app/notes-sync-windows.zip
