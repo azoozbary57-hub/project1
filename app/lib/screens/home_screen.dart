@@ -108,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
         repo: widget.repo,
         syncService: widget.syncService,
         note: note,
+        highlightQuery: _searchQuery.isEmpty ? null : _searchQuery,
       ),
     ));
     _load();

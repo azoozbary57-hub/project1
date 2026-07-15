@@ -9,12 +9,14 @@ class NoteEditorScreen extends StatefulWidget {
   final NotesRepository repo;
   final SyncService syncService;
   final Note? note;
+  final String? highlightQuery;
 
   const NoteEditorScreen({
     super.key,
     required this.repo,
     required this.syncService,
     this.note,
+    this.highlightQuery,
   });
 
   @override
@@ -24,18 +26,37 @@ class NoteEditorScreen extends StatefulWidget {
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _bodyController;
+  final _bodyFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.note?.title ?? '');
     _bodyController = TextEditingController(text: widget.note?.body ?? '');
+    _jumpToSearchMatch();
+  }
+
+  void _jumpToSearchMatch() {
+    final query = widget.highlightQuery?.trim();
+    if (query == null || query.isEmpty) return;
+    final body = _bodyController.text;
+    final index = body.toLowerCase().indexOf(query.toLowerCase());
+    if (index == -1) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _bodyFocusNode.requestFocus();
+      _bodyController.selection = TextSelection(
+        baseOffset: index,
+        extentOffset: index + query.length,
+      );
+    });
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
+    _bodyFocusNode.dispose();
     super.dispose();
   }
 
@@ -95,6 +116,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             Expanded(
               child: TextField(
                 controller: _bodyController,
+                focusNode: _bodyFocusNode,
                 decoration: const InputDecoration(
                   hintText: 'اكتب ملاحظتك هنا...',
                   border: InputBorder.none,
