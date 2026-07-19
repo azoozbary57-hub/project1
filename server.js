@@ -159,6 +159,17 @@ function escapeText(s) {
   return String(s == null ? '' : s).slice(0, 3000);
 }
 
+function saveBase64Image(b64) {
+  const match = String(b64 || '').match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
+  if (!match) return null;
+  const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+  const buf = Buffer.from(match[2], 'base64');
+  if (buf.length > 6 * 1024 * 1024) return null;
+  const filename = crypto.randomBytes(10).toString('hex') + '.' + ext;
+  fs.writeFileSync(path.join(UPLOADS_DIR, filename), buf);
+  return '/uploads/' + filename;
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -225,6 +236,17 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true, products: data.products });
     }
 
+    /* -------- عام: رفع صورة إشعار الدفع -------- */
+    if (method === 'POST' && pathname === '/api/upload-payment-proof') {
+      if (rateLimited('proof:' + clientIp(req), 3000)) {
+        return sendJSON(res, 429, { ok: false, error: 'too_many_requests' });
+      }
+      const body = await readJSON(req, 8000000);
+      const url = saveBase64Image(body.imageBase64);
+      if (!url) return sendJSON(res, 400, { ok: false, error: 'invalid_image' });
+      return sendJSON(res, 200, { ok: true, url });
+    }
+
     /* -------- عام: إنشاء طلب -------- */
     if (method === 'POST' && pathname === '/api/orders') {
       if (rateLimited('order:' + clientIp(req), 2000)) {
@@ -236,6 +258,7 @@ const server = http.createServer(async (req, res) => {
       const address = escapeText(body.address).trim();
       const notes = escapeText(body.notes).trim();
       const paymentMethodId = body.paymentMethodId || null;
+      const paymentProof = typeof body.paymentProofUrl === 'string' ? body.paymentProofUrl.slice(0, 300) : '';
       const cartItems = Array.isArray(body.items) ? body.items : [];
 
       if (!customerName || !phone || !address || cartItems.length === 0) {
@@ -260,8 +283,11 @@ const server = http.createServer(async (req, res) => {
       if (items.length === 0) return sendJSON(res, 400, { ok: false, error: 'no_valid_items' });
 
       const pm = (data.settings.paymentMethods || []).find(p => p.id === paymentMethodId);
-      if ((data.settings.paymentMethods || []).length > 0 && !pm) {
-        return sendJSON(res, 400, { ok: false, error: 'invalid_payment_method' });
+      if ((data.settings.paymentMethods || []).length > 0) {
+        if (!pm) return sendJSON(res, 400, { ok: false, error: 'invalid_payment_method' });
+        if (!/^\/uploads\/[a-f0-9]{10,}\.(png|jpg|jpeg|webp)$/.test(paymentProof)) {
+          return sendJSON(res, 400, { ok: false, error: 'missing_payment_proof' });
+        }
       }
 
       const order = {
@@ -269,6 +295,7 @@ const server = http.createServer(async (req, res) => {
         customerName, phone, address, notes,
         items, total,
         paymentMethodLabel: pm ? pm.label : 'غير محدد',
+        paymentProof: pm ? paymentProof : null,
         status: 'pending',
         createdAt: Date.now()
       };
@@ -398,15 +425,9 @@ const server = http.createServer(async (req, res) => {
 
     if (method === 'POST' && pathname === '/api/admin/upload-image') {
       const body = await readJSON(req, 8000000); // حتى ~8MB base64
-      const b64 = String(body.imageBase64 || '');
-      const match = b64.match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/);
-      if (!match) return sendJSON(res, 400, { ok: false, error: 'invalid_image' });
-      const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
-      const buf = Buffer.from(match[2], 'base64');
-      if (buf.length > 6 * 1024 * 1024) return sendJSON(res, 400, { ok: false, error: 'image_too_large' });
-      const filename = crypto.randomBytes(10).toString('hex') + '.' + ext;
-      fs.writeFileSync(path.join(UPLOADS_DIR, filename), buf);
-      return sendJSON(res, 200, { ok: true, url: '/uploads/' + filename });
+      const url = saveBase64Image(body.imageBase64);
+      if (!url) return sendJSON(res, 400, { ok: false, error: 'invalid_image' });
+      return sendJSON(res, 200, { ok: true, url });
     }
 
     if (method === 'GET' && pathname === '/api/admin/settings') {

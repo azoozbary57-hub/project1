@@ -141,7 +141,7 @@ function fallbackImg(){ return "data:image/svg+xml;utf8," + encodeURIComponent(`
 let state = {
   loading:true, siteName:'شرارة اون لاين', paymentMethods:[], products:[],
   activeCategory:'الكل', cart:[], cartOpen:false, checkoutOpen:false, checkoutStep:1, selectedPM:null, toast:null,
-  ckName:'', ckPhone:'', ckAddress:'', ckNotes:'',
+  ckName:'', ckPhone:'', ckAddress:'', ckNotes:'', paymentProofUrl:'',
 };
 
 async function loadAll(){
@@ -298,6 +298,18 @@ function renderCheckoutPanel(){
         ${pms.length===0?`<p class="field-hint">ما فيه طرق دفع مضافة حالياً من المدير.</p>`:
           pms.map(pm=>`<div class="pm-option ${state.selectedPM===pm.id?'selected':''}" data-act="select-pm" data-id="${pm.id}"><p class="t">${escapeHtml(pm.label)}</p>${pm.details?`<p class="d">${escapeHtml(pm.details)}</p>`:''}</div>`).join('')}
       </div>
+      ${pms.length>0?`
+      <div class="field">
+        <label>صورة إشعار الدفع</label>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          ${state.paymentProofUrl?`<img src="${escapeHtml(state.paymentProofUrl)}" style="width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--surface-2);border:1px solid var(--border);">`:''}
+          <div style="flex:1;">
+            <label for="ck-proof-file" class="btn-secondary" style="display:block;text-align:center;">${state.paymentProofUrl?'تغيير الصورة':'أرفق صورة الإشعار'}</label>
+            <input type="file" id="ck-proof-file" accept="image/*" style="display:none;">
+          </div>
+        </div>
+        <p class="field-hint">أرفق صورة إشعار التحويل/الدفع عشان نأكد طلبك بسرعة.</p>
+      </div>`:''}
     `;
     footerHtml = `<div class="footer-fixed"><div class="cart-total-row"><span>الإجمالي</span><span>${formatPrice(cartTotal())}</span></div>
       <div style="display:flex;gap:8px;">
@@ -312,6 +324,38 @@ function renderCheckoutPanel(){
     </div>`;
   document.getElementById('app').appendChild(wrap);
   wrap.addEventListener('click', e=>{ if(e.target===wrap){ state.checkoutOpen=false; state.checkoutStep=1; render(); } });
+  const proofInput = wrap.querySelector('#ck-proof-file');
+  if(proofInput) proofInput.addEventListener('change', handlePaymentProofPick);
+}
+
+function handlePaymentProofPick(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ showToast('اختر ملف صورة صالح'); return; }
+  if(file.size > 8*1024*1024){ showToast('حجم الصورة كبير جداً'); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = async function(){
+      const MAX_DIM = 900;
+      let w=img.width, h=img.height;
+      if(w>h && w>MAX_DIM){ h=Math.round(h*(MAX_DIM/w)); w=MAX_DIM; } else if(h>MAX_DIM){ w=Math.round(w*(MAX_DIM/h)); h=MAX_DIM; }
+      const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
+      const ctx = canvas.getContext('2d'); ctx.fillStyle='#26201B'; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      showToast('جارِ رفع صورة الإشعار...');
+      try{
+        const res = await fetch('/api/upload-payment-proof', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ imageBase64: dataUrl }) });
+        const data = await res.json();
+        if(data.ok){ state.paymentProofUrl = data.url; render(); showToast('تم رفع صورة الإشعار'); }
+        else{ showToast('تعذر رفع الصورة'); }
+      }catch(err){ showToast('تعذر رفع الصورة'); }
+    };
+    img.onerror = function(){ showToast('تعذر قراءة هذه الصورة'); };
+    img.src = ev.target.result;
+  };
+  reader.onerror = function(){ showToast('تعذر قراءة الملف'); };
+  reader.readAsDataURL(file);
 }
 
 document.addEventListener('click', async function(e){
@@ -347,18 +391,21 @@ async function checkoutNext(){
 async function submitOrder(){
   const name = state.ckName, phone = state.ckPhone, address = state.ckAddress, notes = state.ckNotes;
   if(!name || !phone || !address){ showToast('عبّي الاسم والجوال والعنوان'); return; }
-  if((state.paymentMethods||[]).length>0 && !state.selectedPM){ showToast('اختر طريقة الدفع'); return; }
+  if((state.paymentMethods||[]).length>0){
+    if(!state.selectedPM){ showToast('اختر طريقة الدفع'); return; }
+    if(!state.paymentProofUrl){ showToast('أرفق صورة إشعار الدفع'); return; }
+  }
 
   const items = state.cart.map(c=>({ productId:c.productId, qty:c.qty }));
   try{
     const res = await fetch('/api/orders', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ customerName:name, phone, address, notes, items, paymentMethodId: state.selectedPM })
+      body: JSON.stringify({ customerName:name, phone, address, notes, items, paymentMethodId: state.selectedPM, paymentProofUrl: state.paymentProofUrl })
     });
     const data = await res.json();
     if(!data.ok){ showToast('صار خطأ، حاول مرة ثانية'); return; }
     state.cart=[]; state.checkoutOpen=false; state.checkoutStep=1; state.selectedPM=null;
-    state.ckName=''; state.ckPhone=''; state.ckAddress=''; state.ckNotes='';
+    state.ckName=''; state.ckPhone=''; state.ckAddress=''; state.ckNotes=''; state.paymentProofUrl='';
     render();
     showToast('تم إرسال طلبك، بننتظر تأكيد المتجر');
   }catch(e){
