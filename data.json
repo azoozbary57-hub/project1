@@ -1,0 +1,159 @@
+{
+  "products": [
+    {
+      "id": "5981f12986fed42d",
+      "name": "شميز",
+      "price": 1000,
+      "category": "رجالي",
+      "description": "فاخر",
+      "image": "/uploads/417d571f153e743bc3b8.jpg",
+      "inStock": true
+    }
+  ],
+  "orders": [
+    {
+      "id": "487f27c642aeee2a",
+      "customerName": "عبدالعزيز باري",
+      "phone": "714646179",
+      "address": "اسلم الوسط",
+      "notes": "مقاص M",
+      "items": [
+        {
+          "productId": "bf650ee8dc8dcc0c",
+          "name": "شميز",
+          "price": 1000,
+          "qty": 1
+        }
+      ],
+      "total": 1000,
+      "paymentMethodLabel": "غير محدد",
+      "status": "done",
+      "createdAt": 1783816243287
+    },
+    {
+      "id": "96b0e03f91a7cdf3",
+      "customerName": "عمار باري",
+      "phone": "782868321",
+      "address": "اسلم الثلوث",
+      "notes": "مقاص M",
+      "items": [
+        {
+          "productId": "bf650ee8dc8dcc0c",
+          "name": "شميز",
+          "price": 1000,
+          "qty": 1
+        }
+      ],
+      "total": 1000,
+      "paymentMethodLabel": "جيب",
+      "status": "done",
+      "createdAt": 1783821520832
+    },
+    {
+      "id": "15fdd840d0c0557c",
+      "customerName": "جابر حباط",
+      "phone": "712000204",
+      "address": "الثلوث",
+      "notes": "لون احمر",
+      "items": [
+        {
+          "productId": "3797a11b819b78f2",
+          "name": "شميز",
+          "price": 6000,
+          "qty": 1
+        }
+      ],
+      "total": 6000,
+      "paymentMethodLabel": "جيب",
+      "status": "rejected",
+      "createdAt": 1783833524036
+    },
+    {
+      "id": "f87e4525a9281666",
+      "customerName": "عاصم باري",
+      "phone": "712000203",
+      "address": "HGEG,E",
+      "notes": "مقاص M",
+      "items": [
+        {
+          "productId": "57b92571907e16bc",
+          "name": "شميز",
+          "price": 13000,
+          "qty": 1
+        }
+      ],
+      "total": 13000,
+      "paymentMethodLabel": "جيب",
+      "status": "approved",
+      "createdAt": 1783977225758
+    },
+    {
+      "id": "32536ca6fdd16b83",
+      "customerName": "dkdmdkxkc",
+      "phone": "716464197",
+      "address": "fndjdjd",
+      "notes": "",
+      "items": [
+        {
+          "productId": "57b92571907e16bc",
+          "name": "شميز",
+          "price": 13000,
+          "qty": 2
+        }
+      ],
+      "total": 26000,
+      "paymentMethodLabel": "جيب",
+      "status": "approved",
+      "createdAt": 1783977519880
+    },
+    {
+      "id": "ef8b2ca4557077b7",
+      "customerName": "شادي هادي",
+      "phone": "712000205",
+      "address": "شوقبه",
+      "notes": "خامه حلوه",
+      "items": [
+        {
+          "productId": "40585c982289230e",
+          "name": "شميز",
+          "price": 3000,
+          "qty": 1
+        }
+      ],
+      "total": 3000,
+      "paymentMethodLabel": "جيب",
+      "status": "rejected",
+      "createdAt": 1784200041687
+    },
+    {
+      "id": "d215c4bcd0242458",
+      "customerName": "عبدالرحمن مهيم",
+      "phone": "714262617",
+      "address": "الثلوث",
+      "notes": "مقاص M",
+      "items": [
+        {
+          "productId": "5981f12986fed42d",
+          "name": "شميز",
+          "price": 1000,
+          "qty": 1
+        }
+      ],
+      "total": 1000,
+      "paymentMethodLabel": "جيب",
+      "status": "pending",
+      "createdAt": 1784386367707
+    }
+  ],
+  "settings": {
+    "siteName": "شرارة اون لاين",
+    "paymentMethods": [
+      {
+        "id": "a321ef3ffda1",
+        "label": "جيب",
+        "details": "714646179"
+      }
+    ],
+    "adminPasswordHash": "af204abda4b26e8fc1db0836b6f09149:8c4af8948cdcad52eb58a44088ce972ebe6df391787ac023039be2144c99c1737828a3f78bee29d829e2e942afc6f691f56dfa96ecbeff69a179df1b856dadb4"
+  }
+}
