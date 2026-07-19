@@ -107,6 +107,12 @@
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface-3);border:1px solid var(--spark);color:var(--text);padding:12px 20px;border-radius:12px;font-size:14px;font-weight:700;z-index:200;animation:toastIn .2s ease-out;display:flex;align-items:center;gap:8px;}
   @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px);}to{opacity:1;transform:translate(-50%,0);}}
 
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:22px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;}
+  .stat-card .lbl{font-size:12px;color:var(--text-muted);font-weight:700;}
+  .stat-card .val{font-size:18px;font-weight:900;color:var(--spark-2);}
+  .stats-subhead{font-size:15px;font-weight:800;margin:22px 0 10px;}
+
   @media(max-width:640px){ .row2{grid-template-columns:1fr;} }
 </style>
 </head>
@@ -126,8 +132,13 @@ let state = {
   loading:true, hasAdmin:false, loggedIn:false, loginError:'',
   siteName:'شرارة اون لاين', products:[], orders:[], paymentMethods:[],
   adminTab:'orders', productModal:null, pmModal:null, toast:null, notifPermissionAsked:false,
-  knownOrderIds:new Set(),
+  knownOrderIds:new Set(), statsDate:null,
 };
+
+function ymd(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
 
 async function api(path, opts){
   const res = await fetch(path, Object.assign({ credentials:'include', headers:{'Content-Type':'application/json'} }, opts||{}));
@@ -215,10 +226,11 @@ function renderLogin(){
 
 function renderDashboard(){
   const pendingCount = state.orders.filter(o=>o.status==='pending').length;
-  const tabs = [{id:'orders',label:'الطلبات',badge:pendingCount},{id:'products',label:'المنتجات'},{id:'payments',label:'طرق الدفع'},{id:'settings',label:'الإعدادات'}];
+  const tabs = [{id:'orders',label:'الطلبات',badge:pendingCount},{id:'products',label:'المنتجات'},{id:'stats',label:'الإحصائيات'},{id:'payments',label:'طرق الدفع'},{id:'settings',label:'الإعدادات'}];
   let body = '';
   if(state.adminTab==='orders') body = renderOrdersTab();
   else if(state.adminTab==='products') body = renderProductsTab();
+  else if(state.adminTab==='stats') body = renderStatsTab();
   else if(state.adminTab==='payments') body = renderPaymentsTab();
   else if(state.adminTab==='settings') body = renderSettingsTab();
   return `<div class="admin-shell">
@@ -255,6 +267,62 @@ function renderProductsTab(){
       <div class="acts"><button class="icon-sm" data-act="edit-product" data-id="${p.id}">✎</button><button class="icon-sm" data-act="delete-product" data-id="${p.id}">🗑</button></div>
     </div></div>`).join('');
   return `<div class="admin-header"><h2>المنتجات</h2><button class="btn-add" data-act="new-product">+ إضافة منتج</button></div>${list}`;
+}
+
+function computeStats(){
+  const CONFIRMED = ['approved','done'];
+  const counts = { pending:0, approved:0, rejected:0, done:0 };
+  let confirmedTotal = 0;
+  const productMap = {};
+  state.orders.forEach(o=>{
+    counts[o.status] = (counts[o.status]||0) + 1;
+    if(CONFIRMED.includes(o.status)){
+      confirmedTotal += o.total;
+      (o.items||[]).forEach(it=>{
+        if(!productMap[it.productId]) productMap[it.productId] = { name: it.name, qty:0, revenue:0 };
+        productMap[it.productId].qty += it.qty;
+        productMap[it.productId].revenue += it.price * it.qty;
+      });
+    }
+  });
+  const productStats = Object.values(productMap).sort((a,b)=>b.qty-a.qty);
+  return { counts, confirmedTotal, productStats, bestProduct: productStats[0] || null };
+}
+
+function renderStatsTab(){
+  const stats = computeStats();
+  const dateVal = state.statsDate || ymd(Date.now());
+  const dayOrders = state.orders.filter(o=>ymd(o.createdAt)===dateVal).sort((a,b)=>b.createdAt-a.createdAt);
+  const dayConfirmedTotal = dayOrders.filter(o=>['approved','done'].includes(o.status)).reduce((s,o)=>s+o.total,0);
+
+  const cards = `<div class="stats-grid">
+    <div class="stat-card"><span class="lbl">إجمالي المبيعات المؤكدة</span><span class="val">${formatPrice(stats.confirmedTotal)}</span></div>
+    <div class="stat-card"><span class="lbl">طلبات مؤكدة</span><span class="val">${(stats.counts.approved||0)+(stats.counts.done||0)}</span></div>
+    <div class="stat-card"><span class="lbl">بانتظار الموافقة</span><span class="val">${stats.counts.pending||0}</span></div>
+    <div class="stat-card"><span class="lbl">مرفوضة</span><span class="val">${stats.counts.rejected||0}</span></div>
+    <div class="stat-card"><span class="lbl">المنتج الأكثر طلباً</span><span class="val">${stats.bestProduct?escapeHtml(stats.bestProduct.name)+' ('+stats.bestProduct.qty+')':'—'}</span></div>
+  </div>`;
+
+  const productRows = stats.productStats.length===0
+    ? `<p class="field-hint">ما فيه مبيعات مؤكدة لسا.</p>`
+    : stats.productStats.map(p=>`<div class="table-row"><div class="prow"><div class="info"><p class="n">${escapeHtml(p.name)}</p><span class="m">${p.qty} قطعة مباعة</span></div><div style="font-weight:800;color:var(--spark-2);">${formatPrice(p.revenue)}</div></div></div>`).join('');
+
+  const statusLabelMap = {pending:'بانتظار الموافقة',approved:'مقبول',rejected:'مرفوض',done:'مكتمل'};
+  const statusClassMap = {pending:'status-pending',approved:'status-approved',rejected:'status-rejected',done:'status-done'};
+  const dayRows = dayOrders.length===0
+    ? `<p class="field-hint">ما فيه طلبات في هذا اليوم.</p>`
+    : dayOrders.map(o=>`<div class="table-row"><div class="prow"><div class="info"><p class="n">${escapeHtml(o.customerName)}</p><span class="m">${new Date(o.createdAt).toLocaleTimeString('ar')} · ${formatPrice(o.total)}</span></div><span class="status-pill ${statusClassMap[o.status]}">${statusLabelMap[o.status]}</span></div></div>`).join('');
+
+  return `<div class="admin-header"><h2>الإحصائيات</h2></div>
+    ${cards}
+    <div class="stats-subhead">المبيعات حسب المنتج</div>
+    ${productRows}
+    <div class="stats-subhead">كشف حساب يومي</div>
+    <div class="table-row">
+      <div class="field" style="margin-bottom:0;"><label>اختر اليوم</label><input type="date" id="stats-date" value="${dateVal}"></div>
+    </div>
+    <div class="table-row" style="margin-top:10px;"><div class="prow"><div class="info"><p class="n">إجمالي مبيعات هذا اليوم (مؤكدة)</p></div><div style="font-weight:800;color:var(--spark-2);">${formatPrice(dayConfirmedTotal)}</div></div></div>
+    ${dayRows}`;
 }
 
 function renderPaymentsTab(){
@@ -389,6 +457,10 @@ document.addEventListener('click', async function(e){
 
   else if(act==='save-sitename'){ await saveSitename(); }
   else if(act==='save-password'){ await savePassword(); }
+});
+
+document.addEventListener('change', function(e){
+  if(e.target && e.target.id==='stats-date'){ state.statsDate = e.target.value; render(); }
 });
 
 async function setupAdmin(){
